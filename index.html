@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hunter-resin</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0907; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  header {
+    position: fixed; left: 0; right: 0; bottom: 3vh;
+    text-align: center; pointer-events: none;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(.65rem, 1.1vw, .85rem);
+    letter-spacing: .4em; text-transform: uppercase;
+    color: #e8c28a; opacity: .55;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header>hunter &middot; resin &mdash; click to pour, drag to stir</header>
+<script>
+const c = document.getElementById('c');
+const x = c.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = c.width = innerWidth * dpr;
+  H = c.height = innerHeight * dpr;
+  x.fillStyle = '#0b0907';
+  x.fillRect(0, 0, W, H);
+}
+addEventListener('resize', resize);
+resize();
+
+// amber, rust, teal, umber
+const palette = [[226, 160, 66], [196, 92, 40], [96, 186, 180], [120, 72, 34]];
+const drops = [];
+
+function pour(px, py, n) {
+  for (let i = 0; i < n; i++) {
+    drops.push({
+      x: px + (Math.random() - 0.5) * 20 * dpr,
+      y: py + (Math.random() - 0.5) * 20 * dpr,
+      r: 0,
+      max: (50 + Math.random() * 110) * dpr,
+      v: 0.5 + Math.random() * 0.9,
+      age: 0,
+      col: palette[(Math.random() * palette.length) | 0],
+      seed: Math.random() * Math.PI * 2
+    });
+  }
+  if (drops.length > 400) drops.splice(0, drops.length - 400);
+}
+
+addEventListener('pointerdown', e => pour(e.clientX * dpr, e.clientY * dpr, 6));
+addEventListener('pointermove', e => { if (e.buttons) pour(e.clientX * dpr, e.clientY * dpr, 1); });
+
+// idle: the resin keeps moving on its own
+setInterval(() => pour(Math.random() * W, Math.random() * H, 1), 1800);
+for (let i = 0; i < 8; i++) pour(Math.random() * W, Math.random() * H, 1);
+
+function frame(ms) {
+  const t = ms * 0.001;
+
+  // faint fade gives the trails a slow, viscous look
+  x.globalCompositeOperation = 'source-over';
+  x.fillStyle = 'rgba(11, 9, 7, 0.05)';
+  x.fillRect(0, 0, W, H);
+
+  x.globalCompositeOperation = 'lighter';
+  for (const d of drops) {
+    d.age++;
+    d.r += (d.max - d.r) * 0.01 * d.v;             // spreads, then slows like real resin
+    const R = d.r * (1 + 0.06 * Math.sin(t * 1.3 + d.seed));
+    const cure = Math.min(1, d.age / 900);          // hardens over time: fainter, darker
+    const a = 0.2 * (1 - cure * 0.7);
+    const [r, g, b] = d.col;
+    const gr = x.createRadialGradient(d.x, d.y, 0, d.x, d.y, R);
+    gr.addColorStop(0, `rgba(${r},${g},${b},${a})`);
+    gr.addColorStop(0.7, `rgba(${r},${g},${b},${a * 0.5})`);
+    gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    x.fillStyle = gr;
+    x.beginPath();
+    x.arc(d.x, d.y, R, 0, Math.PI * 2);
+    x.fill();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
